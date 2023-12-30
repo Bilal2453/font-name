@@ -1,24 +1,54 @@
--- TODO: currently we only have the TrueType/OpenType decoder
--- so the decodeMeta return works just fine.
--- But in the future we may support more fonts.
--- and as such we need a shared interface for all of the decoders.
+local FontMeta = require('libs.FontMeta')
 
 local decoders = {
   sfnt = require('decoders.sfnt'),
 }
 
-local EXT_MAP = {
-  ttf = decoders.sfnt.decodeMeta,
-  otf = decoders.sfnt.decodeMeta,
+
+local EXT_DECODER_MAP = {
+  ttf = decoders.sfnt.decode,
+  otf = decoders.sfnt.decode,
 }
 
-local function getDecoderFor(ext)
-  return EXT_MAP[ext]
+
+---Given a binary string of a font file, attempt to guess the
+---right decoder for the font format using the magic number.
+---@param binary string
+local function getFontDecoder(binary)
+  for decoder_name, decoder in pairs(decoders) do
+    if decoder.getMagicNumber(binary) then
+      return decoder, decoder_name
+    end
+  end
+end
+
+---Given a binary string of a font file, attempt to guess the the font format
+---using the magic number.
+---@param binary string
+---@return "truetype"|"opentype"|nil format_name
+local function getFontFormat(binary)
+  for decoder_name, decoder in pairs(decoders) do
+    local _, name = decoder.getMagicNumber(binary)
+    if name then
+      return name
+    end
+  end
+end
+
+local function loadFontString(binary)
+  local decoder = getFontDecoder(binary)
+  if not decoder then
+    return error("unsupported or corrupted font")
+  end
+
+  local decoded_font = assert(decoder.decode(binary))
+  local fontData = decoder.fontMetaStruct(decoded_font)
+  return FontMeta(fontData)
 end
 
 return {
-  getDecoderFor = getDecoderFor,
+  loadFontString = loadFontString,
 
   decoders = decoders,
-  EXT_MAP = EXT_MAP,
+  EXT_DECODER_MAP = EXT_DECODER_MAP,
 }

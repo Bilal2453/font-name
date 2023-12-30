@@ -2,3 +2,5 @@
 *.code-workspace
 *.ttf
 *.otf
+scripts/final.lua
+test.lua
